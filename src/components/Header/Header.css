@@ -1,0 +1,122 @@
+
+.header-root {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: 64px;
+	padding: 0 32px;
+	background: linear-gradient(90deg, #1976d2 0%, #42a5f5 100%);
+	color: #fff;
+	box-shadow: 0 2px 8px rgba(25, 118, 210, 0.08);
+	position: relative;
+	z-index: 10;
+}
+
+.header-title {
+	flex: 1;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.header-title-text {
+	margin: 0;
+	font-weight: 700;
+	letter-spacing: 1px;
+	font-size: 1.5rem;
+	color: #fff;
+	text-shadow: 0 2px 8px rgba(25, 118, 210, 0.15);
+}
+
+.header-user {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.header-avatar-btn {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: #fff;
+	border: none;
+	background: transparent;
+	border-radius: 24px;
+	padding: 6px 10px;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+.header-avatar-btn:hover {
+	background: rgba(255, 255, 255, 0.12);
+}
+
+.header-avatar {
+	width: 34px;
+	height: 34px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 999px;
+	font-weight: 700;
+	background: rgba(255, 255, 255, 0.22);
+	border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.header-username {
+	font-size: 1rem;
+	font-weight: 500;
+	margin-left: 2px;
+	color: #fff;
+}
+
+.header-caret {
+	font-size: 0.78rem;
+	opacity: 0.9;
+	transition: transform 0.2s ease;
+}
+
+.header-caret.open {
+	transform: rotate(180deg);
+}
+
+.header-menu {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 10px);
+	min-width: 220px;
+	padding: 10px;
+	border-radius: 12px;
+	background: #ffffff;
+	color: #0f172a;
+	box-shadow: 0 16px 40px rgba(2, 6, 23, 0.2);
+	z-index: 30;
+}
+
+.header-menu-email {
+	font-size: 0.9rem;
+	color: #475569;
+	padding: 8px 10px;
+	border-radius: 8px;
+	background: #f8fafc;
+	margin-bottom: 8px;
+	word-break: break-word;
+}
+
+.header-menu-item {
+	width: 100%;
+	border: none;
+	border-radius: 8px;
+	padding: 10px;
+	text-align: left;
+	font-size: 0.95rem;
+	font-weight: 600;
+	color: #b91c1c;
+	background: #fef2f2;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+
+.header-menu-item:hover {
+	background: #fee2e2;
+}

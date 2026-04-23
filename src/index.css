@@ -1,0 +1,108 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #f6fbff;
+  --bg-secondary: #eef7ff;
+  --text-primary: #0f172a;
+  --panel-bg: rgba(255, 255, 255, 0.72);
+  --panel-border: rgba(148, 163, 184, 0.28);
+}
+
+.dark {
+  --bg-primary: #061122;
+  --bg-secondary: #0d1b2f;
+  --text-primary: #e2e8f0;
+  --panel-bg: rgba(15, 23, 42, 0.58);
+  --panel-border: rgba(148, 163, 184, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Space Grotesk', sans-serif;
+  color: var(--text-primary);
+  background: radial-gradient(circle at 18% 20%, rgba(14, 165, 233, 0.16), transparent 40%),
+    radial-gradient(circle at 82% 8%, rgba(16, 185, 129, 0.14), transparent 36%),
+    radial-gradient(circle at 50% 95%, rgba(245, 158, 11, 0.1), transparent 26%),
+    linear-gradient(160deg, var(--bg-primary), var(--bg-secondary));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.bg-theme {
+  background: radial-gradient(circle at 18% 20%, rgba(14, 165, 233, 0.16), transparent 40%),
+    radial-gradient(circle at 82% 8%, rgba(16, 185, 129, 0.14), transparent 36%),
+    radial-gradient(circle at 50% 95%, rgba(245, 158, 11, 0.1), transparent 26%),
+    linear-gradient(160deg, var(--bg-primary), var(--bg-secondary));
+}
+
+.glass-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(16px);
+}
+
+.glass-panel-soft {
+  background: color-mix(in srgb, var(--panel-bg) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--panel-border) 86%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.font-display {
+  font-family: 'Sora', sans-serif;
+}
+
+.animate-ripple {
+  animation: ripple 0.65s linear;
+}
+
+.animate-shake {
+  animation: shake 0.35s ease-in-out;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.85), rgba(16, 185, 129, 0.85));
+}

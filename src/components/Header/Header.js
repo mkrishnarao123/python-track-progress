@@ -1,11 +1,33 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import './Header.css';
 
 function Header({ user, onLogout }) {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
   const menuRef = React.useRef(null);
-  const profile = user || { name: 'Krishna', email: 'krishna@example.com' };
+
+  const profile = useMemo(() => {
+    const token = sessionStorage.getItem('authToken');
+    const authUserStr = sessionStorage.getItem('authUser');
+
+    if (token && authUserStr) {
+      try {
+        const authUser = JSON.parse(authUserStr);
+
+        return {
+          name: authUser.name || authUser.username || 'Learner',
+          email: authUser.username || 'user@example.com',
+          username: authUser.username,
+          mobileNumber: authUser.mobileNumber,
+          id: authUser.id,
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    return user || null;
+  }, [user]);
 
   const handleMenu = (event) => {
     setAnchorEl((prev) => (prev ? null : event.currentTarget));

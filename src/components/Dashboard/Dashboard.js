@@ -1,32 +1,49 @@
-import checklistData from '../Checklist/checklist.json';
+import { useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import dashboardData from '../JSONFiles/dashboard.json';
+import { fetchChecklistDays, selectChecklistDays } from '../../store/pythonLearnSlice';
 import './Dashboard.css';
 
+function renderTemplate(template, values) {
+  return template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? '');
+}
+
 function Dashboard({ user }) {
+  const dispatch = useDispatch();
+  const days = useSelector(selectChecklistDays);
+
+  useEffect(() => {
+    dispatch(fetchChecklistDays());
+  }, [dispatch]);
+
   const userName = user?.name || 'Learner';
-  const totalDays = checklistData.days.length;
-  const totalTasks = checklistData.days.reduce((count, day) => count + day.tasks.length, 0);
-  const bonusTopics = checklistData.supplementalTopics || [];
+  const totalDays = days.length;
+  const totalTasks = useMemo(
+    () => days.reduce((count, day) => count + day.tasks.length, 0),
+    [days]
+  );
+  const bonusTopics = useMemo(
+    () => days.flatMap((day) => day.extraTopics || []),
+    [days]
+  );
   const quickStats = [
     { label: 'Learning Streak', value: `${Math.min(12, totalDays)} Days`, tone: 'sky' },
     { label: 'Tasks In Curriculum', value: String(totalTasks), tone: 'green' },
     { label: 'Bonus Topics Added', value: String(bonusTopics.length), tone: 'amber' },
     {
       label: 'Project Days',
-      value: String(checklistData.days.filter((day) => day.title.toLowerCase().includes('project')).length),
+      value: String(days.filter((day) => day.title.toLowerCase().includes('project')).length),
       tone: 'violet',
     },
   ];
-  const activity = checklistData.days.slice(0, 4).map((day) => `Day ${day.day}: ${day.title}`);
+  const activity = days.slice(0, 4).map((day) => `Day ${day.day}: ${day.title}`);
 
   return (
     <section className="dashboard-root">
       <div className="dashboard-hero glass-panel-soft">
-        <p className="dashboard-kicker">Welcome back</p>
-        <h2>{userName}, your learning path is on track</h2>
-        <p>
-          Keep momentum strong by finishing today&apos;s checklist and reviewing one concept from
-          yesterday.
-        </p>
+        <p className="dashboard-kicker">{dashboardData.hero.kicker}</p>
+        <h2>{renderTemplate(dashboardData.hero.title, { userName })}</h2>
+        <p>{dashboardData.hero.description}</p>
       </div>
 
       <div className="dashboard-stats">
@@ -42,10 +59,9 @@ function Dashboard({ user }) {
         <article className="dashboard-card glass-panel-soft">
           <h3>Today&apos;s Focus</h3>
           <ul>
-            <li>Complete one coding practice session</li>
-            <li>Update your checklist progress</li>
-            <li>Prepare tomorrow&apos;s study plan</li>
-            <li>Review one bonus topic from the curriculum</li>
+            {dashboardData.todayFocus.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
           </ul>
         </article>
 

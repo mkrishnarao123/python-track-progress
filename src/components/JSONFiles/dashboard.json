@@ -1,0 +1,13 @@
+{
+  "hero": {
+    "kicker": "Welcome back",
+    "title": "{userName}, your learning path is on track",
+    "description": "Keep momentum strong by finishing today's checklist and reviewing one concept from yesterday."
+  },
+  "todayFocus": [
+    "Complete one coding practice session",
+    "Update your checklist progress",
+    "Prepare tomorrow's study plan",
+    "Review one bonus topic from the curriculum"
+  ]
+}

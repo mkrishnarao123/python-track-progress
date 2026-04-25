@@ -1,11 +1,7 @@
 import './UserManagement.css';
+import usersData from '../JSONFiles/users.json';
 
-const users = [
-  { name: 'Krishna', email: 'krishna@example.com', role: 'Admin', status: 'Active' },
-  { name: 'Anu', email: 'anu@example.com', role: 'Learner', status: 'Active' },
-  { name: 'Ravi', email: 'ravi@example.com', role: 'Mentor', status: 'Invited' },
-  { name: 'Meera', email: 'meera@example.com', role: 'Learner', status: 'Inactive' },
-];
+const users = usersData.users;
 
 function UserManagement() {
   return (

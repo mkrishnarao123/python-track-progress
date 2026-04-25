@@ -1,28 +1,54 @@
-export async function mockLogin({ email, password }) {
-  await new Promise((resolve) => setTimeout(resolve, 1100));
+import axios from 'axios';
+import { requestFinished, requestStarted } from '../store/loadingSlice';
 
-  if (!email || !password) {
-    throw new Error('Email and password are required');
+const API_BASE_URL = (process.env.REACT_APP_BASE_API_URL || '').trim().replace(/\/+$/, '');
+
+export const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+let interceptorsConfigured = false;
+
+export function setupApiLoadingInterceptors(store) {
+  if (interceptorsConfigured) {
+    return;
   }
 
-  return {
-    token: 'demo-auth-token',
-    user: {
-      name: email.split('@')[0] || 'Traveler',
-      email,
+  apiClient.interceptors.request.use(
+    (config) => {
+      if (!config?.skipGlobalLoading) {
+        store.dispatch(requestStarted());
+      }
+      return config;
     },
-  };
+    (error) => {
+      store.dispatch(requestFinished());
+      return Promise.reject(error);
+    }
+  );
+
+  apiClient.interceptors.response.use(
+    (response) => {
+      if (!response?.config?.skipGlobalLoading) {
+        store.dispatch(requestFinished());
+      }
+      return response;
+    },
+    (error) => {
+      if (!error?.config?.skipGlobalLoading) {
+        store.dispatch(requestFinished());
+      }
+      return Promise.reject(error);
+    }
+  );
+
+  interceptorsConfigured = true;
 }
 
-export async function mockSignup(payload) {
-  await new Promise((resolve) => setTimeout(resolve, 900));
-
-  if (!payload.email || !payload.username || !payload.password) {
-    throw new Error('Please fill all required signup fields');
-  }
-
-  return {
-    id: `user-${Date.now()}`,
-    ...payload,
-  };
+if (!API_BASE_URL) {
+  // eslint-disable-next-line no-console
+  console.warn('REACT_APP_BASE_API_URL is not set. Auth requests may fail until .env is loaded.');
 }

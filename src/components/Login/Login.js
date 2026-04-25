@@ -1,93 +1,126 @@
-import React, { useState } from "react";
-import "./Login.css";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import './Login.css';
+import { mockLogin } from '../../services/auth_api';
 
-function Login() {
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+function Login({ onLoginSuccess }) {
   const navigate = useNavigate();
-
+  const [formData, setFormData] = useState({
+    username: '',
+    password: '',
+  });
   const [errors, setErrors] = useState({});
+  const [apiError, setApiError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Handle input changes
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Validate form fields
   const validate = () => {
-    let newErrors = {};
-    if (!formData.email) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Invalid email format";
+    const nextErrors = {};
+
+    if (!formData.username.trim()) {
+      nextErrors.username = 'Username is required';
     }
+
     if (!formData.password) {
-      newErrors.password = "Password is required";
+      nextErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+      nextErrors.password = 'Password must be at least 6 characters';
     }
-    return newErrors;
+
+    return nextErrors;
   };
 
-  // Handle form submission
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setApiError('');
+
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-    } else {
-      setErrors({});
-      alert("Login successful!");
-      console.log("Form Data:", formData);
+      return;
+    }
+
+    setErrors({});
+    setIsSubmitting(true);
+
+    try {
+      const payload = {
+        username: formData.username.trim(),
+        password: formData.password,
+      };
+      const response = await mockLogin(payload);
+      const { token, user } = response.data;
+
+      sessionStorage.setItem('authToken', token);
+      sessionStorage.setItem('authUser', JSON.stringify(user));
+
+      if (onLoginSuccess) {
+        onLoginSuccess(user, token);
+      }
+
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
+      setApiError(error.message || 'Login failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  function handleSignup() {
-    navigate("/signup");
-  }
-
   return (
-    <div className="signup-container">
-      <form className="signup-form">
-        <h2>Login</h2>
+    <main className="login-page">
+      <div className="login-background-shape login-shape-one" />
+      <div className="login-background-shape login-shape-two" />
 
-        <div className="form-group">
-          <label>Email</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            placeholder="Enter your email"
-          />
-          {errors.email && <small className="error">{errors.email}</small>}
-        </div>
+      <section className="login-card" aria-label="Login form">
+        <p className="login-kicker">Welcome Back</p>
+        <h1>Sign in to your learning dashboard</h1>
+        <p className="login-subtitle">Use your username and password to continue your progress.</p>
 
-        <div className="form-group">
-          <label>Password</label>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            placeholder="Enter your password"
-          />
-          {errors.password && (
-            <small className="error">{errors.password}</small>
-          )}
-        </div>
+        <form onSubmit={handleSubmit} className="login-form" noValidate>
+          <div className="login-field">
+            <label htmlFor="username">Username</label>
+            <input
+              id="username"
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              placeholder="Enter your username"
+              autoComplete="username"
+            />
+            {errors.username && <small className="login-error">{errors.username}</small>}
+          </div>
 
-        <button className="btn-submit" onClick={handleSubmit}> 
-          Login
-        </button>
-        <button className="btn-submit" onClick={() => handleSignup()}>
-          Sign Up
-        </button>
-      </form>
-    </div>
+          <div className="login-field">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Enter your password"
+              autoComplete="current-password"
+            />
+            {errors.password && <small className="login-error">{errors.password}</small>}
+          </div>
+
+          {apiError && <p className="login-api-error">{apiError}</p>}
+
+          <button type="submit" className="login-primary-btn" disabled={isSubmitting}>
+            {isSubmitting ? 'Signing in...' : 'Login'}
+          </button>
+
+          <p className="login-footer-text">
+            New user? <Link to="/signup">Create an account</Link>
+          </p>
+        </form>
+      </section>
+    </main>
   );
 }
 

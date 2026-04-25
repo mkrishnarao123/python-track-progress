@@ -1,42 +1,35 @@
+import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { NavLink } from 'react-router-dom';
 import { BookOpenCheck, Code2, LayoutDashboard, MessageSquareQuote, UserCog } from 'lucide-react';
+import { fetchSidebarMenuData, selectSidebarMenuData } from '../../store/pythonLearnSlice';
 import './Sidebar.css';
 
-const menuItems = [
-  {
-    label: 'Dashboard',
-    path: '/dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    label: 'User Management',
-    path: '/user-management',
-    icon: UserCog,
-  },
-  {
-    label: 'Checklist',
-    path: '/checklist',
-    icon: BookOpenCheck,
-  },
-  {
-    label: 'Practice Code',
-    path: '/practiceCode',
-    icon: Code2,
-  },
-  {
-    label: 'Interview Q&A',
-    path: '/interview-qa',
-    icon: MessageSquareQuote,
-  },
-];
+const iconMap = {
+  LayoutDashboard,
+  UserCog,
+  BookOpenCheck,
+  Code2,
+  MessageSquareQuote,
+};
+
 
 function Sidebar() {
+  const dispatch = useDispatch();
+  const sidebarConfig = useSelector(selectSidebarMenuData);
+
+  useEffect(() => {
+    dispatch(fetchSidebarMenuData());
+  }, [dispatch]);
+
+  const menuItems = sidebarConfig?.menuItems || [];
+
   return (
     <aside className="sidebar-root">
-      <div className="sidebar-brand">Learning Hub</div>
+      <div className="sidebar-brand">{sidebarConfig?.brand}</div>
       <nav className="sidebar-nav" aria-label="Main navigation">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
+        {menuItems?.map((item) => {
+          const Icon = iconMap[item.iconKey] || LayoutDashboard;
           return (
             <NavLink
               key={item.path}
@@ -51,7 +44,7 @@ function Sidebar() {
           );
         })}
       </nav>
-      <div className="sidebar-footer">Track your progress daily</div>
+      <div className="sidebar-footer">{sidebarConfig?.footer}</div>
     </aside>
   );
 }

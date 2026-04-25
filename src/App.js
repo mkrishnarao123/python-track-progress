@@ -11,6 +11,7 @@ import UserManagement from './components/UserManagement/UserManagement';
 import Checklist from './components/Checklist/Checklist';
 import PracticeCode from './components/PracticeCode/PracticeCode';
 import InterviewQA from './components/InterviewQA/InterviewQA';
+import GlobalLoading from './components/GlobalLoading/GlobalLoading';
 
 function DashboardLayout({ user, onLogout }) {
   return (
@@ -32,10 +33,23 @@ function DashboardLayout({ user, onLogout }) {
 
 function App() {
   const location = useLocation();
-
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(sessionStorage.getItem('authToken')));
+  const [user, setUser] = useState(() => {
+    const rawUser = sessionStorage.getItem('authUser');
+
+    if (!rawUser) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(rawUser);
+    } catch {
+      return null;
+    }
+  });
+  const hasToken = Boolean(sessionStorage.getItem('authToken'));
+  const canAccessProtectedRoutes = isAuthenticated && hasToken;
 
   const handleLoginSuccess = (nextUser) => {
     setUser(nextUser);
@@ -43,6 +57,8 @@ function App() {
   };
 
   const handleLogout = () => {
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('authUser');
     setIsAuthenticated(false);
     setUser(null);
     navigate('/login');
@@ -57,13 +73,20 @@ function App() {
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.24 }}
       >
+        <GlobalLoading />
         <Routes location={location}>
-          <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-          <Route path="/signup" element={<Signup />} />
+          <Route
+            path="/login"
+            element={canAccessProtectedRoutes ? <Navigate to="/dashboard" replace /> : <Login onLoginSuccess={handleLoginSuccess} />}
+          />
+          <Route
+            path="/signup"
+            element={canAccessProtectedRoutes ? <Navigate to="/dashboard" replace /> : <Signup />}
+          />
           <Route
             path="/"
             element={
-              isAuthenticated ? (
+              canAccessProtectedRoutes ? (
                 <DashboardLayout user={user} onLogout={handleLogout} />
               ) : (
                 <Navigate to="/login" replace />
@@ -72,10 +95,10 @@ function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard user={user} />} />
-            <Route path="user-management" element={<UserManagement user={user } />} />
-            <Route path="checklist" element={<Checklist user={user } />} />
-            <Route path="practiceCode" element={<PracticeCode user={user } />} />
-            <Route path="interview-qa" element={<InterviewQA user={user } />} />
+            <Route path="user-management" element={<UserManagement user={user} />} />
+            <Route path="checklist" element={<Checklist user={user} />} />
+            <Route path="practiceCode" element={<PracticeCode user={user} />} />
+            <Route path="interview-qa" element={<InterviewQA user={user} />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

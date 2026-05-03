@@ -7,6 +7,7 @@ import {
   selectQuizBankData,
 } from '../../store/pythonLearnSlice';
 import './Checklist.css';
+import { checkAnswers } from '../../services/python_learn_api';
 
 function getTaskLearningLink(task) {
   if (task.link) {
@@ -27,14 +28,6 @@ function normalizeText(value) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ' ');
-}
-
-function tokenize(value) {
-  return normalizeText(value)
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .split(' ')
-    .map((item) => item.trim())
-    .filter((item) => item.length > 2);
 }
 
 function getGoogleSearchUrl(query) {
@@ -84,43 +77,6 @@ function getBestQuizMatch(task, day, quizBankData) {
   };
 }
 
-function doesPhraseMatch(userAnswer, phrase) {
-  const normalizedAnswer = normalizeText(userAnswer);
-  const normalizedPhrase = normalizeText(phrase);
-
-  if (!normalizedAnswer || !normalizedPhrase) {
-    return false;
-  }
-
-  if (
-    normalizedAnswer.includes(normalizedPhrase) ||
-    normalizedPhrase.includes(normalizedAnswer)
-  ) {
-    return true;
-  }
-
-  const answerTokens = tokenize(normalizedAnswer);
-  const phraseTokens = tokenize(normalizedPhrase);
-
-  if (!answerTokens.length || !phraseTokens.length) {
-    return false;
-  }
-
-  const overlap = phraseTokens.filter((token) => answerTokens.includes(token)).length;
-  const coverage = overlap / phraseTokens.length;
-
-  return coverage >= 0.45 || overlap >= 2;
-}
-
-function isAnswerCorrect(question, userAnswer) {
-  const accepted = [
-    ...(question.acceptedPhrases || []),
-    question.answer,
-  ].filter(Boolean);
-
-  return accepted.some((phrase) => doesPhraseMatch(userAnswer, phrase));
-}
-
 function buildTaskQuiz(task, day, quizBankData) {
   const match = getBestQuizMatch(task, day, quizBankData);
   const topic = match.topic;
@@ -143,18 +99,19 @@ function isDayUnlocked(days, dayIndex) {
   }
 
   const previousDay = days[dayIndex - 1];
-  return previousDay?.tasks?.every((task) => task.done) ?? false;
+  return previousDay?.tasks?.every((task) => task.done_default) ?? false;
 }
 
 export default function Checklist({ user }) {
   const dispatch = useDispatch();
   const checklistDays = useSelector(selectChecklistDays);
   const quizBankData = useSelector(selectQuizBankData);
-  const [days, setDays] = useState([]);
+  const days = checklistDays;
   const [quizState, setQuizState] = useState({
     open: false,
     dayIndex: -1,
     taskIndex: -1,
+    taskId: '',
     taskText: '',
     topicId: '',
     topicTitle: '',
@@ -164,7 +121,9 @@ export default function Checklist({ user }) {
     answers: ['', '', ''],
     revealedAnswers: {},
     error: '',
+    isSubmitting: false,
   });
+  const [taskToggleLoading, setTaskToggleLoading] = useState({});
 
   useEffect(() => {
     dispatch(fetchChecklistDays());
@@ -172,43 +131,15 @@ export default function Checklist({ user }) {
   }, [dispatch]);
 
   useEffect(() => {
-      const sourceDays = checklistDays;
-      const saved = localStorage.getItem('checklist');
-      if (!saved) {
-        setDays(sourceDays);
-        return;
-      }
-
-      let savedDays = [];
-      try {
-        savedDays = JSON.parse(saved);
-      } catch {
-        savedDays = [];
-      }
-
-      const mergedDays = sourceDays.map((day) => {
-        const savedDay = savedDays.find((item) => item.day === day.day);
-
-        if (!savedDay) {
-          return day;
-        }
-
-        return {
-          ...day,
-          tasks: day.tasks.map((task, taskIndex) => ({
-            ...task,
-            done: Boolean(savedDay.tasks?.[taskIndex]?.done),
-          })),
-        };
-      });
-
-      setDays(mergedDays);
-  }, [checklistDays]);
+    const handleFocus = () => dispatch(fetchChecklistDays({ force: true }));
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [dispatch]);
 
   const summary = useMemo(() => {
-    const totalTasks = days.reduce((count, day) => count + day.tasks.length, 0);
-    const doneTasks = days.reduce(
-      (count, day) => count + day.tasks.filter((task) => task.done).length,
+    const totalTasks = checklistDays.reduce((count, day) => count + day.tasks.length, 0);
+    const doneTasks = checklistDays.reduce(
+      (count, day) => count + day.tasks.filter((task) => task.done_default).length,
       0
     );
 
@@ -218,30 +149,14 @@ export default function Checklist({ user }) {
       pendingTasks: totalTasks - doneTasks,
       progress: totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0,
     };
-  }, [days]);
-
-  const setTaskStatus = (dayIndex, taskIndex, done) => {
-    setDays((prevDays) => {
-      const updated = [...prevDays];
-      const targetDay = updated[dayIndex];
-
-      updated[dayIndex] = {
-        ...targetDay,
-        tasks: targetDay.tasks.map((task, index) =>
-          index === taskIndex ? { ...task, done } : task
-        ),
-      };
-
-      localStorage.setItem('checklist', JSON.stringify(updated));
-      return updated;
-    });
-  };
+  }, [checklistDays]);
 
   const closeQuizModal = () => {
     setQuizState({
       open: false,
       dayIndex: -1,
       taskIndex: -1,
+      taskId: '',
       taskText: '',
       topicId: '',
       topicTitle: '',
@@ -251,6 +166,7 @@ export default function Checklist({ user }) {
       answers: ['', '', ''],
       revealedAnswers: {},
       error: '',
+      isSubmitting: false,
     });
   };
 
@@ -276,35 +192,95 @@ export default function Checklist({ user }) {
     }));
   };
 
-  const handleQuizSubmit = (event) => {
+  const handleQuizSubmit = async (event) => {
     event.preventDefault();
 
-    const allCorrect = quizState.questions.every((question, index) => {
-      const answer = quizState.answers[index];
-      return isAnswerCorrect(question, answer);
-    });
+    setQuizState((prev) => ({
+      ...prev,
+      isSubmitting: true,
+      error: '',
+    }));
 
-    if (!allCorrect) {
+    try {
+      const answersPayload = quizState.questions.map((question, index) => ({
+        id: question.id,
+        answer: quizState.answers[index],
+        topicId: quizState.topicId,
+        subtopicId: quizState.subtopicId,
+      }));
+
+      const response = await checkAnswers(answersPayload);
+
+      if (response?.data?.success || response?.data?.correct) {
+        dispatch(fetchChecklistDays({ force: true }));
+        closeQuizModal();
+      } else {
+        setQuizState((prev) => ({
+          ...prev,
+          error: response?.data?.message || 'Some answers are incorrect. Please try again.',
+          isSubmitting: false,
+        }));
+      }
+    } catch (error) {
       setQuizState((prev) => ({
         ...prev,
-        error: 'Some answers are incorrect. Please try again.',
+        error: error.message || 'Unable to verify answers. Please try again.',
+        isSubmitting: false,
       }));
-      return;
     }
-
-    setTaskStatus(quizState.dayIndex, quizState.taskIndex, true);
-    closeQuizModal();
   };
 
-  const updateTask = (dayIndex, taskIndex) => {
+  const handleTaskToggle = async (dayIndex, taskIndex,  topicId, subtopicId) => {
+    console.log(topicId, subtopicId)
     if (!isDayUnlocked(days, dayIndex)) {
       return;
     }
 
     const task = days[dayIndex].tasks[taskIndex];
+    if (!task?.id) {
+      return;
+    }
 
-    if (task.done) {
-      setTaskStatus(dayIndex, taskIndex, false);
+    setTaskToggleLoading((prev) => ({ ...prev, [task.id]: true }));
+
+    try {
+      const response = await checkAnswers([
+        {
+          id: task.id,
+          answer: '',
+          topicId: topicId,
+          subtopicId: subtopicId,
+        },
+      ]);
+
+      if (response?.data?.success || response?.data?.correct || response?.status === 200) {
+        dispatch(fetchChecklistDays({ force: true }));
+      } else {
+        throw new Error(response?.data?.message || 'Unable to update task status.');
+      }
+    } catch (error) {
+      setQuizState((prev) => ({
+        ...prev,
+        error: error.message || 'Unable to update task status. Please try again.',
+      }));
+    } finally {
+      setTaskToggleLoading((prev) => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
+    }
+  };
+
+  const updateTask = (dayIndex, taskIndex, topicId, subtopicId) => {
+    if (!isDayUnlocked(days, dayIndex)) {
+      return;
+    }
+
+    const task = checklistDays[dayIndex].tasks[taskIndex];
+
+    if (task.done_default) {
+      handleTaskToggle(dayIndex, taskIndex, topicId, subtopicId);
       return;
     }
 
@@ -314,10 +290,11 @@ export default function Checklist({ user }) {
       open: true,
       dayIndex,
       taskIndex,
+      taskId: task.id || '',
       taskText: task.text,
-      topicId: questions[0]?.topicId || '',
+      topicId: task.topicId || questions[0]?.topicId || '',
       topicTitle: questions[0]?.topicTitle || '',
-      subtopicId: questions[0]?.subtopicId || '',
+      subtopicId: task.subtopicId || questions[0]?.subtopicId || '',
       subtopicTitle: questions[0]?.subtopicTitle || '',
       questions,
       answers: ['', '', ''],
@@ -331,7 +308,7 @@ export default function Checklist({ user }) {
   return (
     <section className="checklist-root">
       <div className="checklist-header glass-panel-soft">
-        <h2>{userName}&apos;s {days.length} Day Learning Checklist</h2>
+        <h2>{userName}&apos;s {checklistDays.length} Day Learning Checklist</h2>
         <p>Mark your completed tasks and keep your streak going.</p>
       </div>
 
@@ -358,13 +335,14 @@ export default function Checklist({ user }) {
         <div className="progress-bar" style={{ width: `${summary.progress}%` }} />
       </div>
 
-      {days.map((day, i) => (
+      {checklistDays.map((day, i) => (
         <DayItem
           key={i}
           day={day}
           dayIndex={i}
           updateTask={updateTask}
-          isLocked={!isDayUnlocked(days, i)}
+          taskToggleLoading={taskToggleLoading}
+          isLocked={!isDayUnlocked(checklistDays, i)}
         />
       ))}
 
@@ -379,6 +357,7 @@ export default function Checklist({ user }) {
           answers={quizState.answers}
           revealedAnswers={quizState.revealedAnswers}
           error={quizState.error}
+          isSubmitting={quizState.isSubmitting}
           onAnswerChange={handleQuizAnswerChange}
           onToggleAnswer={toggleQuizAnswer}
           onClose={closeQuizModal}
@@ -390,8 +369,8 @@ export default function Checklist({ user }) {
   );
 }
 
-function DayItem({ day, dayIndex, updateTask, isLocked }) {
-  const doneCount = day.tasks.filter((task) => task.done).length;
+function DayItem({ day, dayIndex, updateTask, taskToggleLoading, isLocked }) {
+  const doneCount = day.tasks.filter((task) => task.done_default).length;
   const dayProgress = Math.round((doneCount / day.tasks.length) * 100);
 
   return (
@@ -414,15 +393,15 @@ function DayItem({ day, dayIndex, updateTask, isLocked }) {
       <div className="task-list">
         {day.tasks.map((task, i) => (
           <div
-            className={`task-item ${task.done ? 'done' : ''}`}
+            className={`task-item ${task.done_default ? 'done' : ''}`}
             key={`${day.day}-${i}`}
           >
             <label className="task-main">
               <input
                 type="checkbox"
-                checked={task.done}
-                onChange={() => updateTask(dayIndex, i)}
-                disabled={isLocked}
+                checked={task.done_default}
+                onChange={() => updateTask(dayIndex, i, day.id, task.id )}
+                disabled={isLocked || Boolean(taskToggleLoading[task.id])}
               />
               <span>{task.text}</span>
             </label>
@@ -462,6 +441,7 @@ function QuizModal({
   answers,
   revealedAnswers,
   error,
+  isSubmitting,
   onAnswerChange,
   onToggleAnswer,
   onClose,
@@ -512,11 +492,11 @@ function QuizModal({
           {error && <p className="quiz-error">{error}</p>}
 
           <div className="quiz-actions">
-            <button type="button" className="quiz-btn secondary" onClick={onClose}>
+            <button type="button" className="quiz-btn secondary" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </button>
-            <button type="submit" className="quiz-btn primary">
-              Verify & Complete
+            <button type="submit" className="quiz-btn primary" disabled={isSubmitting}>
+              {isSubmitting ? 'Verifying...' : 'Verify & Complete'}
             </button>
           </div>
         </form>

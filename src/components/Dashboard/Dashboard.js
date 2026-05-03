@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import dashboardData from '../JSONFiles/dashboard.json';
+import dashboardData from './dashboard.json';
 import { fetchChecklistDays, selectChecklistDays } from '../../store/pythonLearnSlice';
 import './Dashboard.css';
 

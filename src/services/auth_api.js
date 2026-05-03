@@ -47,3 +47,42 @@ export async function mockLogin(payload) {
     },
   };
 }
+
+function normalizeAllUsers(data) {
+  const list = Array.isArray(data) ? data : data?.users || data?.data || [];
+
+  return list.map((item, index) => ({
+    id: item?.id || item?._id || `user-${index}`,
+    fullName: item?.fullName || item?.fullname || item?.name || '',
+    username: item?.username || item?.userName || '',
+    restart: Boolean(item?.restart),
+  }));
+}
+
+export async function fetchAllUsers() {
+  const token = sessionStorage.getItem('authToken');
+  const response = await apiClient.get('/auth/all-users', {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+
+  const responseData = response?.data || {};
+
+  return {
+    ...response,
+    data: normalizeAllUsers(responseData),
+  };
+}
+
+export async function restartUser(userId) {
+  const token = sessionStorage.getItem('authToken');
+  // PUT to /pythonlearn/restart with user id in the body
+  const payload = { id: userId };
+
+  const response = await apiClient.put('/pythonlearn/restart', payload, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+
+  return response;
+}
+
+

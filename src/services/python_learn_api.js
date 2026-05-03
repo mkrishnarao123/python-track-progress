@@ -2,8 +2,11 @@ import { apiClient } from './api';
 
 function normalizeTask(task) {
 	return {
+		id: task?.id || task?.task_id || '',
+		topicId: task?.topicId || task?.topic_id || '',
+		subtopicId: task?.subtopicId || task?.subtopic_id || '',
 		text: task?.text || task?.task_text || '',
-		done: Boolean(task?.done ?? task?.done_default ?? false),
+		done_default: Boolean(task?.done_default ?? task?.done ?? false),
 	};
 }
 
@@ -24,6 +27,7 @@ function normalizeChecklistDay(day) {
 
 	return {
 		day: Number(day?.day ?? day?.day_number ?? 0),
+		id: day.id,
 		title: day?.title || '',
 		tasks: Array.isArray(tasks) ? tasks.map(normalizeTask) : [],
 		extraTopics: Array.isArray(extraTopics) ? extraTopics.map(normalizeExtraTopic) : [],
@@ -216,3 +220,10 @@ export async function getQuizBankData() {
 	return normalizeQuizBankPayload(response.data);
 }
 
+export async function checkAnswers(answers) {
+  const payload = Array.isArray(answers) ? answers : [answers];
+
+  const response = await apiClient.put('/pythonlearn/check-answer', payload);
+
+  return response;
+}

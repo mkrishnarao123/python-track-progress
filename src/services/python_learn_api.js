@@ -1,4 +1,5 @@
 import { apiClient } from './api';
+import { getAuthUserId } from '../utils/authUtils';
 
 function normalizeTask(task) {
 	return {
@@ -49,7 +50,11 @@ function normalizeChecklistPayload(payload) {
 }
 
 export async function getChecklistDays() {
-	const response = await apiClient.get('/pythonlearn/ChecklistDay');
+	const userId = getAuthUserId();
+	if (!userId) {
+		throw new Error('User ID not found. Please login again.');
+	}
+	const response = await apiClient.get(`/pythonlearn/ChecklistDay/${userId}`);
 	return normalizeChecklistPayload(response.data);
 }
 
@@ -223,7 +228,18 @@ export async function getQuizBankData() {
 export async function checkAnswers(answers) {
   const payload = Array.isArray(answers) ? answers : [answers];
 
-  const response = await apiClient.put('/pythonlearn/check-answer', payload);
+  const response = await apiClient.post('/pythonlearn/check-answer', payload);
 
   return response;
+}
+
+export async function getSubtopicQuestions(subtopicId) {
+  const response = await apiClient.get(`/pythonlearn/subtopic-questions/${subtopicId}`);
+  return normalizeSubtopicQuestionsPayload(response.data, subtopicId);
+}
+
+function normalizeSubtopicQuestionsPayload(payload, subtopicId) {
+  const questionsSource = Array.isArray(payload) ? payload : payload?.questions || payload?.data || [];
+
+  return questionsSource.map((question) => normalizeQuizQuestion(question));
 }

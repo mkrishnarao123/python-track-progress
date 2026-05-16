@@ -20,7 +20,7 @@ function Sidebar() {
 
   useEffect(() => {
     dispatch(fetchSidebarMenuData());
-  }, [dispatch]);
+  }, []);
 
   const menuItems = sidebarConfig?.menuItems || [];
 

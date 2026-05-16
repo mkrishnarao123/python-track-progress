@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import './Header.css';
+import { getAuthUser } from '../../utils/authUtils';
 
 function Header({ user, onLogout }) {
   const [anchorEl, setAnchorEl] = React.useState(null);
@@ -7,23 +8,16 @@ function Header({ user, onLogout }) {
   const menuRef = React.useRef(null);
 
   const profile = useMemo(() => {
-    const token = sessionStorage.getItem('authToken');
-    const authUserStr = sessionStorage.getItem('authUser');
+    const authUser = getAuthUser();
 
-    if (token && authUserStr) {
-      try {
-        const authUser = JSON.parse(authUserStr);
-
-        return {
-          name: authUser.name || authUser.username || 'Learner',
-          email: authUser.username || 'user@example.com',
-          username: authUser.username,
-          mobileNumber: authUser.mobileNumber,
-          id: authUser.id,
-        };
-      } catch {
-        return null;
-      }
+    if (authUser) {
+      return {
+        name: authUser.name || authUser.username || 'Learner',
+        email: authUser.username || 'user@example.com',
+        username: authUser.username,
+        mobileNumber: authUser.mobileNumber,
+        id: authUser.id,
+      };
     }
 
     return user || null;

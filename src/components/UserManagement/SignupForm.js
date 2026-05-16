@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './UserManagement.css';
-import { mockSignup } from '../../services/auth_api';
+import { signup } from '../../services/auth_api';
 
 function SignupForm({
   onSuccess,
@@ -84,7 +84,7 @@ function SignupForm({
         restart: false
       };
 
-      const response = await mockSignup(payload);
+      const response = await signup(payload);
 
       if (onSuccess) {
         onSuccess(response?.data || payload);

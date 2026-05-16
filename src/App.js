@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
+import { useDispatch } from 'react-redux';
 import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
 import Signup from './components/Signup/Signup';
@@ -12,6 +13,7 @@ import Checklist from './components/Checklist/Checklist';
 import PracticeCode from './components/PracticeCode/PracticeCode';
 import InterviewQA from './components/InterviewQA/InterviewQA';
 import GlobalLoading from './components/GlobalLoading/GlobalLoading';
+import { getAuthToken, getAuthUser, clearAuthData } from './utils/authUtils';
 
 function DashboardLayout({ user, onLogout }) {
   return (
@@ -34,21 +36,10 @@ function DashboardLayout({ user, onLogout }) {
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(sessionStorage.getItem('authToken')));
-  const [user, setUser] = useState(() => {
-    const rawUser = sessionStorage.getItem('authUser');
-
-    if (!rawUser) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(rawUser);
-    } catch {
-      return null;
-    }
-  });
-  const hasToken = Boolean(sessionStorage.getItem('authToken'));
+  const dispatch = useDispatch();
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getAuthToken()));
+  const [user, setUser] = useState(() => getAuthUser());
+  const hasToken = Boolean(getAuthToken());
   const canAccessProtectedRoutes = isAuthenticated && hasToken;
 
   const handleLoginSuccess = (nextUser) => {
@@ -57,8 +48,20 @@ function App() {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('authToken');
-    sessionStorage.removeItem('authUser');
+    // Clear all auth data and sessionStorage
+    clearAuthData();
+
+    // Reset redux slices to initial state
+    try {
+      const { resetPythonLearnState } = require('./store/pythonLearnSlice');
+      const { resetLoadingState } = require('./store/loadingSlice');
+      dispatch(resetPythonLearnState());
+      dispatch(resetLoadingState());
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('Failed to reset redux state on logout', err);
+    }
+
     setIsAuthenticated(false);
     setUser(null);
     navigate('/login');

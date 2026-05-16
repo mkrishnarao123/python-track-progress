@@ -2,12 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchChecklistDays,
-  fetchQuizBankData,
   selectChecklistDays,
-  selectQuizBankData,
 } from '../../store/pythonLearnSlice';
 import './Checklist.css';
-import { checkAnswers } from '../../services/python_learn_api';
+import { checkAnswers, getSubtopicQuestions } from '../../services/python_learn_api';
+import { getAuthUserId } from '../../utils/authUtils';
 
 function getTaskLearningLink(task) {
   if (task.link) {
@@ -23,76 +22,6 @@ function getTaskReadLink(task) {
   return `https://www.google.com/search?q=${query}`;
 }
 
-function normalizeText(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-}
-
-function getGoogleSearchUrl(query) {
-  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-}
-
-function getBestQuizMatch(task, day, quizBankData) {
-  const context = normalizeText(`${task.text} ${day.title}`);
-  const topics = quizBankData?.topics || [];
-
-  let bestTopic = null;
-  let bestSubtopic = null;
-  let maxScore = -1;
-
-  topics.forEach((topic) => {
-    (topic.subtopics || []).forEach((subtopic) => {
-      const matchers = [subtopic.title, ...(subtopic.matchers || []), ...(topic.keywords || [])]
-        .filter(Boolean)
-        .map((item) => normalizeText(item));
-
-      let score = 0;
-
-      matchers.forEach((matcher) => {
-        if (context.includes(matcher)) {
-          score += matcher === normalizeText(subtopic.title) ? 3 : 1;
-        }
-      });
-
-      if (score > maxScore) {
-        maxScore = score;
-        bestTopic = topic;
-        bestSubtopic = subtopic;
-      }
-    });
-  });
-
-  if (bestTopic && bestSubtopic && maxScore > 0) {
-    return { topic: bestTopic, subtopic: bestSubtopic };
-  }
-
-  const fallbackTopic = topics.find((topic) => topic.id === 'general') || topics[0];
-  const fallbackSubtopic = fallbackTopic?.subtopics?.[0] || null;
-
-  return {
-    topic: fallbackTopic,
-    subtopic: fallbackSubtopic,
-  };
-}
-
-function buildTaskQuiz(task, day, quizBankData) {
-  const match = getBestQuizMatch(task, day, quizBankData);
-  const topic = match.topic;
-  const subtopic = match.subtopic;
-  const sourceUrl = getGoogleSearchUrl(subtopic?.googleQuery || topic?.googleQuery || `python ${task.text}`);
-
-  return (subtopic?.questions || topic?.questions || []).slice(0, 3).map((question) => ({
-    ...question,
-    sourceUrl,
-    topicId: topic?.id,
-    topicTitle: topic?.title || topic?.id || 'Topic',
-    subtopicId: subtopic?.id,
-    subtopicTitle: subtopic?.title || subtopic?.id || topic?.title || 'Subtopic',
-  }));
-}
-
 function isDayUnlocked(days, dayIndex) {
   if (dayIndex === 0) {
     return true;
@@ -105,7 +34,6 @@ function isDayUnlocked(days, dayIndex) {
 export default function Checklist({ user }) {
   const dispatch = useDispatch();
   const checklistDays = useSelector(selectChecklistDays);
-  const quizBankData = useSelector(selectQuizBankData);
   const days = checklistDays;
   const [quizState, setQuizState] = useState({
     open: false,
@@ -124,10 +52,10 @@ export default function Checklist({ user }) {
     isSubmitting: false,
   });
   const [taskToggleLoading, setTaskToggleLoading] = useState({});
+  const [quizLoadingState, setQuizLoadingState] = useState({});
 
   useEffect(() => {
     dispatch(fetchChecklistDays());
-    dispatch(fetchQuizBankData());
   }, [dispatch]);
 
   useEffect(() => {
@@ -202,8 +130,14 @@ export default function Checklist({ user }) {
     }));
 
     try {
+      const userId = getAuthUserId();
+      if (!userId) {
+        throw new Error('User ID not found. Please login again.');
+      }
+
       const answersPayload = quizState.questions.map((question, index) => ({
         id: question.id,
+        user_id: userId,
         answer: quizState.answers[index],
         topicId: quizState.topicId,
         subtopicId: quizState.subtopicId,
@@ -231,7 +165,6 @@ export default function Checklist({ user }) {
   };
 
   const handleTaskToggle = async (dayIndex, taskIndex,  topicId, subtopicId) => {
-    console.log(topicId, subtopicId)
     if (!isDayUnlocked(days, dayIndex)) {
       return;
     }
@@ -244,9 +177,15 @@ export default function Checklist({ user }) {
     setTaskToggleLoading((prev) => ({ ...prev, [task.id]: true }));
 
     try {
+      const userId = getAuthUserId();
+      if (!userId) {
+        throw new Error('User ID not found. Please login again.');
+      }
+
       const response = await checkAnswers([
         {
           id: task.id,
+          user_id: userId,
           answer: '',
           topicId: topicId,
           subtopicId: subtopicId,
@@ -272,7 +211,7 @@ export default function Checklist({ user }) {
     }
   };
 
-  const updateTask = (dayIndex, taskIndex, topicId, subtopicId) => {
+  const updateTask = async (dayIndex, taskIndex, topicId, subtopicId) => {
     if (!isDayUnlocked(days, dayIndex)) {
       return;
     }
@@ -284,23 +223,54 @@ export default function Checklist({ user }) {
       return;
     }
 
-    const questions = buildTaskQuiz(task, days[dayIndex], quizBankData);
-
-    setQuizState({
-      open: true,
-      dayIndex,
-      taskIndex,
-      taskId: task.id || '',
-      taskText: task.text,
-      topicId: task.topicId || questions[0]?.topicId || '',
-      topicTitle: questions[0]?.topicTitle || '',
-      subtopicId: task.subtopicId || questions[0]?.subtopicId || '',
-      subtopicTitle: questions[0]?.subtopicTitle || '',
-      questions,
-      answers: ['', '', ''],
-      revealedAnswers: {},
+    // Set loading state
+    setQuizLoadingState((prev) => ({ ...prev, [task.id]: true }));
+    setQuizState((prev) => ({
+      ...prev,
       error: '',
-    });
+    }));
+
+    try {
+      // Fetch questions from the new API using subtopicId
+      const questionsData = await getSubtopicQuestions(subtopicId);
+      
+      // Transform the response to include additional fields expected by the modal
+      const questions = Array.isArray(questionsData) ? questionsData.map((q) => ({
+        ...q,
+        sourceUrl: `https://www.google.com/search?q=${encodeURIComponent(`python ${task.text}`)}`,
+        topicId: topicId || '',
+        topicTitle: topicId || 'Topic',
+        subtopicId: subtopicId || '',
+        subtopicTitle: subtopicId || 'Subtopic',
+      })) : [];
+
+      setQuizState({
+        open: true,
+        dayIndex,
+        taskIndex,
+        taskId: task.id || '',
+        taskText: task.text,
+        topicId: topicId || '',
+        topicTitle: topicId || 'Topic',
+        subtopicId: subtopicId || '',
+        subtopicTitle: subtopicId || 'Subtopic',
+        questions,
+        answers: Array(questions.length).fill(''),
+        revealedAnswers: {},
+        error: '',
+      });
+    } catch (error) {
+      setQuizState((prev) => ({
+        ...prev,
+        error: error.message || 'Failed to load questions. Please try again.',
+      }));
+    } finally {
+      setQuizLoadingState((prev) => {
+        const next = { ...prev };
+        delete next[task.id];
+        return next;
+      });
+    }
   };
 
   const userName = user?.name || 'Learner';
@@ -342,6 +312,7 @@ export default function Checklist({ user }) {
           dayIndex={i}
           updateTask={updateTask}
           taskToggleLoading={taskToggleLoading}
+          quizLoadingState={quizLoadingState}
           isLocked={!isDayUnlocked(checklistDays, i)}
         />
       ))}
@@ -369,7 +340,7 @@ export default function Checklist({ user }) {
   );
 }
 
-function DayItem({ day, dayIndex, updateTask, taskToggleLoading, isLocked }) {
+function DayItem({ day, dayIndex, updateTask, taskToggleLoading, quizLoadingState, isLocked }) {
   const doneCount = day.tasks.filter((task) => task.done_default).length;
   const dayProgress = Math.round((doneCount / day.tasks.length) * 100);
 
@@ -401,7 +372,7 @@ function DayItem({ day, dayIndex, updateTask, taskToggleLoading, isLocked }) {
                 type="checkbox"
                 checked={task.done_default}
                 onChange={() => updateTask(dayIndex, i, day.id, task.id )}
-                disabled={isLocked || Boolean(taskToggleLoading[task.id])}
+                disabled={isLocked || Boolean(taskToggleLoading[task.id]) || Boolean(quizLoadingState[task.id])}
               />
               <span>{task.text}</span>
             </label>

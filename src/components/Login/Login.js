@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './Login.css';
-import { mockLogin } from '../../services/auth_api';
+import { login } from '../../services/auth_api';
+import { setAuthData } from '../../utils/authUtils';
 
 function Login({ onLoginSuccess }) {
   const navigate = useNavigate();
@@ -52,11 +53,10 @@ function Login({ onLoginSuccess }) {
         username: formData.username.trim(),
         password: formData.password,
       };
-      const response = await mockLogin(payload);
+      const response = await login(payload);
       const { token, user } = response.data;
 
-      sessionStorage.setItem('authToken', token);
-      sessionStorage.setItem('authUser', JSON.stringify(user));
+      setAuthData(token, user);
 
       if (onLoginSuccess) {
         onLoginSuccess(user, token);

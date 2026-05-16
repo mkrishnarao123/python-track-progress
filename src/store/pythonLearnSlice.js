@@ -35,17 +35,7 @@ function getInitialState() {
 function createResourceThunk(typePrefix, fetcher, stateKey) {
   return createAsyncThunk(
     typePrefix,
-    async (args) => fetcher(args),
-    {
-      condition: (args, { getState }) => {
-        if (args?.force === true) {
-          return true;
-        }
-
-        const status = getState().pythonLearn[stateKey].status;
-        return status !== 'loading' && status !== 'succeeded';
-      },
-    }
+    async (args) => fetcher(args)
   );
 }
 

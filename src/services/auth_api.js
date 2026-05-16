@@ -1,13 +1,12 @@
 import { apiClient } from "./api";
+import { getAuthToken } from "../utils/authUtils";
 
-
-
-function normalizeAuthUser(data, fallbackPayload) {
+function normalizeAuthUser(data) {
   return {
-    id: data?.id || data?.user?.id || `user-${Date.now()}`,
-    username: data?.username || data?.user?.username || fallbackPayload?.username || '',
-    name: data?.name || data?.fullName || data?.user?.name || data?.user?.fullName || fallbackPayload?.fullName || fallbackPayload?.username || '',
-    mobileNumber: data?.mobileNumber || data?.user?.mobileNumber || fallbackPayload?.mobileNumber || '',
+    id: data.user_details.id,
+    username: data.user_details.username,
+    name: data.user_details.fullName,
+    mobileNumber: data.user_details.mobileNumber,
   };
 }
 
@@ -15,7 +14,7 @@ function normalizeToken(data) {
   return data?.token || data?.accessToken || data?.access_token || data?.data?.token || '';
 }
 
-export async function mockSignup(payload) {
+export async function signup(payload) {
   const response = await apiClient.post('/auth/user', payload);
   const responseData = response?.data || {};
 
@@ -30,7 +29,7 @@ export async function mockSignup(payload) {
   };
 }
 
-export async function mockLogin(payload) {
+export async function login(payload) {
   const response = await apiClient.post('/auth/login', payload);
   const responseData = response?.data || {};
   const token = normalizeToken(responseData);
@@ -60,7 +59,7 @@ function normalizeAllUsers(data) {
 }
 
 export async function fetchAllUsers() {
-  const token = sessionStorage.getItem('authToken');
+  const token = getAuthToken();
   const response = await apiClient.get('/auth/all-users', {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
@@ -74,11 +73,10 @@ export async function fetchAllUsers() {
 }
 
 export async function restartUser(userId) {
-  const token = sessionStorage.getItem('authToken');
-  // PUT to /pythonlearn/restart with user id in the body
+  const token = getAuthToken();
   const payload = { id: userId };
 
-  const response = await apiClient.put('/pythonlearn/restart', payload, {
+  const response = await apiClient.put(`/pythonlearn/restart/${userId}`, payload, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 
